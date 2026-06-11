@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ─── paths ────────────────────────────────────────────────────────────────────
+TEMPLATES_DIR="$HOME/.local/share/cc-sandbox"
+CLAUDE_BIN="$HOME/.local/bin/claude"
+CLAUDE_SHARE="$HOME/.local/share/claude"
+
+# ─── init command ─────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "init" ]]; then
+    echo "Initializing cc-sandbox in: $PWD"
+
+    # .cc-sandbox.conf
+    if [[ -f ".cc-sandbox.conf" ]]; then
+        echo "  [skip] .cc-sandbox.conf already exists"
+    else
+        cp "$TEMPLATES_DIR/.cc-sandbox.conf" ".cc-sandbox.conf"
+        echo "  [ok]   .cc-sandbox.conf"
+    fi
+
+    echo "Done. Edit .cc-sandbox.conf to adjust mounts and network."
+    exit 0
+fi
+
+# ─── load per-project config ──────────────────────────────────────────────────
+EXTRA_BIND_RO=""
+EXTRA_BIND_RW=""
+ENV_VARS=""
+
+if [[ -f ".cc-sandbox.conf" ]]; then
+    # shellcheck source=/dev/null
+    source ".cc-sandbox.conf"
+fi
+
+# ─── build bwrap args ─────────────────────────────────────────────────────────
+BWRAP_ARGS=()
+
+# system — read only
+BWRAP_ARGS+=(--ro-bind /usr /usr)
+BWRAP_ARGS+=(--ro-bind /lib /lib)
+[[ -d /lib64 ]] && BWRAP_ARGS+=(--ro-bind /lib64 /lib64)
+BWRAP_ARGS+=(--ro-bind /bin /bin)
+
+# /etc — only what's needed
+BWRAP_ARGS+=(--ro-bind /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf)
+BWRAP_ARGS+=(--ro-bind /etc/hosts /etc/hosts)
+BWRAP_ARGS+=(--ro-bind /etc/ssl/certs /etc/ssl/certs)
+BWRAP_ARGS+=(--ro-bind /etc/passwd /etc/passwd)
+BWRAP_ARGS+=(--ro-bind /etc/group /etc/group)
+
+# claude — read only (binary + runtime)
+BWRAP_ARGS+=(--ro-bind "$CLAUDE_SHARE" "$CLAUDE_SHARE")
+BWRAP_ARGS+=(--ro-bind "$CLAUDE_BIN" "$CLAUDE_BIN")
+
+# claude working data — cache, backups, changelog
+BWRAP_ARGS+=(--bind "$HOME/.claude" "$HOME/.claude")
+
+# claude config & metadata — settings, preferences, userID
+BWRAP_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
+
+# project — read/write
+BWRAP_ARGS+=(--bind "$PWD" "$PWD")
+
+# extra mounts from .cc-sandbox.conf
+for path in $EXTRA_BIND_RO; do
+    [[ -e "$path" ]] && BWRAP_ARGS+=(--ro-bind "$path" "$path")
+done
+for path in $EXTRA_BIND_RW; do
+    [[ -e "$path" ]] && BWRAP_ARGS+=(--bind "$path" "$path")
+done
+
+# /proc /dev /tmp
+BWRAP_ARGS+=(--proc /proc)
+BWRAP_ARGS+=(--dev /dev)
+BWRAP_ARGS+=(--tmpfs /tmp)
+
+# namespaces
+BWRAP_ARGS+=(--unshare-all)
+BWRAP_ARGS+=(--share-net)
+
+# env
+BWRAP_ARGS+=(--setenv HOME "$HOME")
+BWRAP_ARGS+=(--setenv USER "$USER")
+for var in $ENV_VARS; do
+    BWRAP_ARGS+=(--setenv "${var%%=*}" "${var#*=}")
+done
+
+# misc
+BWRAP_ARGS+=(--die-with-parent)
+BWRAP_ARGS+=(--new-session)
+BWRAP_ARGS+=(--chdir "$PWD")
+
+# ─── log command ─────────────────────────────────────────────────────────────
+LOG_FILE="$HOME/.local/share/cc-sandbox/launch.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+echo "----------------------------------------" >> "$LOG_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S') | $PWD" >> "$LOG_FILE"
+echo "bwrap ${BWRAP_ARGS[*]} -- $CLAUDE_BIN $*" >> "$LOG_FILE"
+
+# ─── launch ───────────────────────────────────────────────────────────────────
+exec bwrap "${BWRAP_ARGS[@]}" -- "$CLAUDE_BIN" "$@"
