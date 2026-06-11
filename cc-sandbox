@@ -40,7 +40,7 @@ if [[ "${1:-}" == "init" ]]; then
     _gitignore_append '.cc-sandbox.conf'
     _gitignore_append '.cc-sandbox.log'
 
-    echo "Done. Edit .cc-sandbox.conf to adjust mounts and network."
+    echo "Done. Edit .cc-sandbox.conf to adjust mounts and environment variables."
     exit 0
 fi
 
@@ -84,6 +84,11 @@ BWRAP_ARGS+=(--bind "$HOME/.claude" "$HOME/.claude")
 # claude config & metadata — settings, preferences, userID
 [[ -f "$HOME/.claude.json" ]] || echo '{}' > "$HOME/.claude.json"
 BWRAP_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
+
+# git — global identity & config, read-only (Claude shells out to git; without
+# this, commits fail with "Author identity unknown")
+[[ -f "$HOME/.gitconfig" ]]   && BWRAP_ARGS+=(--ro-bind "$HOME/.gitconfig" "$HOME/.gitconfig")
+[[ -d "$HOME/.config/git" ]]  && BWRAP_ARGS+=(--ro-bind "$HOME/.config/git" "$HOME/.config/git")
 
 # project — read/write
 BWRAP_ARGS+=(--bind "$PWD" "$PWD")

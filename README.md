@@ -73,6 +73,7 @@ Everything below is the *complete* list of what Claude can see. Read-only unless
 | `/etc/passwd`, `/etc/group` | ro | UID→name lookups; some tools (`git`) warn without an entry | Optional but recommended |
 | `~/.claude` | **rw** | Claude's state: **auth** (`.credentials.json`), sessions, history, projects, cache, plugins, memory | **Yes** — without it Claude is logged out and stateless |
 | `~/.claude.json` | **rw** | Config & metadata: `userID`, account info, onboarding flags, per-project trust & history | **Yes** for a seamless experience (not auth — that lives in `~/.claude`) |
+| `~/.gitconfig`, `~/.config/git` | ro | Global git identity & config — Claude shells out to `git`; without it commits fail with "Author identity unknown" | Optional — only if it exists on the host |
 | `$PWD` | **rw** | The project you're working on | **Yes** — the whole point |
 | `/proc` | proc | Process filesystem — required by Node and many tools | **Yes** |
 | `/dev` | dev | Minimal device nodes (`/dev/null`, `/dev/urandom`, tty) | **Yes** |
