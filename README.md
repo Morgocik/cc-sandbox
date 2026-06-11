@@ -21,11 +21,13 @@ mounted — so it cannot be touched, leaked, or deleted.
 ## Install
 
 ```sh
-install -Dm755 cc-sandbox ~/.local/bin/cc-sandbox
-install -Dm644 .cc-sandbox.conf ~/.local/share/cc-sandbox/.cc-sandbox.conf
+./install.sh
 ```
 
-Make sure `~/.local/bin` is on your `PATH`. (Respects `$XDG_DATA_HOME` if set.)
+The installer verifies that `bwrap` and `claude` are present (and tells you how to
+install them if not), then copies `cc-sandbox` to `~/.local/bin` and the config
+template to `$XDG_DATA_HOME/cc-sandbox` (default `~/.local/share/cc-sandbox`).
+Make sure `~/.local/bin` is on your `PATH`.
 
 ## Usage
 
