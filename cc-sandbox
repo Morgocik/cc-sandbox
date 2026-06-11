@@ -3,8 +3,12 @@ set -euo pipefail
 
 # ─── paths ────────────────────────────────────────────────────────────────────
 TEMPLATES_DIR="$HOME/.local/share/cc-sandbox"
-CLAUDE_BIN="$HOME/.local/bin/claude"
-CLAUDE_SHARE="$HOME/.local/share/claude"
+CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude 2>/dev/null)}"
+if [[ -z "$CLAUDE_BIN" ]]; then
+    echo "error: claude not found in PATH. Set CLAUDE_BIN to override." >&2
+    exit 1
+fi
+CLAUDE_SHARE="${CLAUDE_SHARE:-$(dirname "$(dirname "$CLAUDE_BIN")")/share/claude}"
 
 # ─── init command ─────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "init" ]]; then
@@ -18,6 +22,18 @@ if [[ "${1:-}" == "init" ]]; then
         echo "  [ok]   .cc-sandbox.conf"
     fi
 
+    # .gitignore — append cc-sandbox entries if not already present
+    _gitignore_append() {
+        if ! grep -qxF "$1" .gitignore 2>/dev/null; then
+            echo "$1" >> .gitignore
+            echo "  [ok]   .gitignore ($1)"
+        else
+            echo "  [skip] .gitignore ($1 already present)"
+        fi
+    }
+    _gitignore_append '.cc-sandbox.conf'
+    _gitignore_append '.cc-sandbox.log'
+
     echo "Done. Edit .cc-sandbox.conf to adjust mounts and network."
     exit 0
 fi
@@ -26,6 +42,7 @@ fi
 EXTRA_BIND_RO=""
 EXTRA_BIND_RW=""
 ENV_VARS=""
+DEBUG=false
 
 if [[ -f ".cc-sandbox.conf" ]]; then
     # shellcheck source=/dev/null
@@ -49,7 +66,7 @@ BWRAP_ARGS+=(--ro-bind /etc/passwd /etc/passwd)
 BWRAP_ARGS+=(--ro-bind /etc/group /etc/group)
 
 # claude — read only (binary + runtime)
-BWRAP_ARGS+=(--ro-bind "$CLAUDE_SHARE" "$CLAUDE_SHARE")
+[[ -d "$CLAUDE_SHARE" ]] && BWRAP_ARGS+=(--ro-bind "$CLAUDE_SHARE" "$CLAUDE_SHARE")
 BWRAP_ARGS+=(--ro-bind "$CLAUDE_BIN" "$CLAUDE_BIN")
 
 # claude working data — cache, backups, changelog
@@ -90,12 +107,12 @@ BWRAP_ARGS+=(--die-with-parent)
 BWRAP_ARGS+=(--new-session)
 BWRAP_ARGS+=(--chdir "$PWD")
 
-# ─── log command ─────────────────────────────────────────────────────────────
-LOG_FILE="$HOME/.local/share/cc-sandbox/launch.log"
-mkdir -p "$(dirname "$LOG_FILE")"
-echo "----------------------------------------" >> "$LOG_FILE"
-echo "$(date '+%Y-%m-%d %H:%M:%S') | $PWD" >> "$LOG_FILE"
-echo "bwrap ${BWRAP_ARGS[*]} -- $CLAUDE_BIN $*" >> "$LOG_FILE"
+# ─── debug mode ──────────────────────────────────────────────────────────────
+if [[ "$DEBUG" == "true" ]]; then
+    echo "bwrap ${BWRAP_ARGS[*]} -- $CLAUDE_BIN $*" > .cc-sandbox.log
+    echo "debug: command written to $PWD/.cc-sandbox.log"
+    exit 0
+fi
 
 # ─── launch ───────────────────────────────────────────────────────────────────
 exec bwrap "${BWRAP_ARGS[@]}" -- "$CLAUDE_BIN" "$@"
