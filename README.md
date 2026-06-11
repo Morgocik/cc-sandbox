@@ -70,6 +70,7 @@ Everything below is the *complete* list of what Claude can see. Read-only unless
 | `/etc/resolv.conf` | ro | DNS servers — resolved via `readlink -f`, so it works with systemd-resolved, NetworkManager, or a plain file | **Yes** — no DNS, no API |
 | `/etc/ssl/certs`, `/etc/pki` | ro | CA certificates for TLS; Claude talks HTTPS to the API | **Yes** — no certs, no TLS |
 | `/etc/hosts` | ro | Host/localhost name resolution | Optional — degrades gracefully |
+| `/etc/localtime` | ro | Local timezone — without it git commits inside the sandbox are stamped UTC instead of your local offset | Optional — falls back to UTC |
 | `/etc/passwd`, `/etc/group` | ro | UID→name lookups; some tools (`git`) warn without an entry | Optional but recommended |
 | `~/.claude` | **rw** | Claude's state: **auth** (`.credentials.json`), sessions, history, projects, cache, plugins, memory | **Yes** — without it Claude is logged out and stateless |
 | `~/.claude.json` | **rw** | Config & metadata: `userID`, account info, onboarding flags, per-project trust & history | **Yes** for a seamless experience (not auth — that lives in `~/.claude`) |

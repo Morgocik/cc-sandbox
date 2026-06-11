@@ -68,6 +68,10 @@ BWRAP_ARGS+=(--ro-bind /usr /usr)
 RESOLV="$(readlink -f /etc/resolv.conf 2>/dev/null || echo /etc/resolv.conf)"
 [[ -e "$RESOLV" ]]      && BWRAP_ARGS+=(--ro-bind "$RESOLV" /etc/resolv.conf)
 [[ -e /etc/hosts ]]     && BWRAP_ARGS+=(--ro-bind /etc/hosts /etc/hosts)
+# /etc/localtime — local timezone, so git commits inside the sandbox keep your
+# offset instead of being stamped UTC (resolved like resolv.conf, as it's a symlink)
+LOCALTIME="$(readlink -f /etc/localtime 2>/dev/null || echo /etc/localtime)"
+[[ -e "$LOCALTIME" ]]   && BWRAP_ARGS+=(--ro-bind "$LOCALTIME" /etc/localtime)
 [[ -e /etc/ssl/certs ]] && BWRAP_ARGS+=(--ro-bind /etc/ssl/certs /etc/ssl/certs)
 [[ -e /etc/pki ]]       && BWRAP_ARGS+=(--ro-bind /etc/pki /etc/pki)
 [[ -e /etc/passwd ]]    && BWRAP_ARGS+=(--ro-bind /etc/passwd /etc/passwd)
