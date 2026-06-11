@@ -2,7 +2,13 @@
 set -euo pipefail
 
 # ─── paths ────────────────────────────────────────────────────────────────────
-TEMPLATES_DIR="$HOME/.local/share/cc-sandbox"
+TEMPLATES_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/cc-sandbox"
+
+if ! command -v bwrap >/dev/null 2>&1; then
+    echo "error: bwrap not found. Install the 'bubblewrap' package." >&2
+    exit 1
+fi
+
 CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude 2>/dev/null)}"
 if [[ -z "$CLAUDE_BIN" ]]; then
     echo "error: claude not found in PATH. Set CLAUDE_BIN to override." >&2
@@ -52,27 +58,31 @@ fi
 # ─── build bwrap args ─────────────────────────────────────────────────────────
 BWRAP_ARGS=()
 
-# system — read only
+# system — read only (guarded: /lib /bin may be split or merged into /usr)
 BWRAP_ARGS+=(--ro-bind /usr /usr)
-BWRAP_ARGS+=(--ro-bind /lib /lib)
-[[ -d /lib64 ]] && BWRAP_ARGS+=(--ro-bind /lib64 /lib64)
-BWRAP_ARGS+=(--ro-bind /bin /bin)
+[[ -e /lib ]]   && BWRAP_ARGS+=(--ro-bind /lib /lib)
+[[ -e /lib64 ]] && BWRAP_ARGS+=(--ro-bind /lib64 /lib64)
+[[ -e /bin ]]   && BWRAP_ARGS+=(--ro-bind /bin /bin)
 
-# /etc — only what's needed
-BWRAP_ARGS+=(--ro-bind /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf)
-BWRAP_ARGS+=(--ro-bind /etc/hosts /etc/hosts)
-BWRAP_ARGS+=(--ro-bind /etc/ssl/certs /etc/ssl/certs)
-BWRAP_ARGS+=(--ro-bind /etc/passwd /etc/passwd)
-BWRAP_ARGS+=(--ro-bind /etc/group /etc/group)
+# /etc — only what's needed (each guarded; layouts differ across distros)
+RESOLV="$(readlink -f /etc/resolv.conf 2>/dev/null || echo /etc/resolv.conf)"
+[[ -e "$RESOLV" ]]      && BWRAP_ARGS+=(--ro-bind "$RESOLV" /etc/resolv.conf)
+[[ -e /etc/hosts ]]     && BWRAP_ARGS+=(--ro-bind /etc/hosts /etc/hosts)
+[[ -e /etc/ssl/certs ]] && BWRAP_ARGS+=(--ro-bind /etc/ssl/certs /etc/ssl/certs)
+[[ -e /etc/pki ]]       && BWRAP_ARGS+=(--ro-bind /etc/pki /etc/pki)
+[[ -e /etc/passwd ]]    && BWRAP_ARGS+=(--ro-bind /etc/passwd /etc/passwd)
+[[ -e /etc/group ]]     && BWRAP_ARGS+=(--ro-bind /etc/group /etc/group)
 
 # claude — read only (binary + runtime)
 [[ -d "$CLAUDE_SHARE" ]] && BWRAP_ARGS+=(--ro-bind "$CLAUDE_SHARE" "$CLAUDE_SHARE")
 BWRAP_ARGS+=(--ro-bind "$CLAUDE_BIN" "$CLAUDE_BIN")
 
 # claude working data — cache, backups, changelog
+mkdir -p "$HOME/.claude"
 BWRAP_ARGS+=(--bind "$HOME/.claude" "$HOME/.claude")
 
 # claude config & metadata — settings, preferences, userID
+[[ -f "$HOME/.claude.json" ]] || echo '{}' > "$HOME/.claude.json"
 BWRAP_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
 
 # project — read/write
@@ -97,7 +107,7 @@ BWRAP_ARGS+=(--share-net)
 
 # env
 BWRAP_ARGS+=(--setenv HOME "$HOME")
-BWRAP_ARGS+=(--setenv USER "$USER")
+BWRAP_ARGS+=(--setenv USER "${USER:-$(id -un)}")
 for var in $ENV_VARS; do
     BWRAP_ARGS+=(--setenv "${var%%=*}" "${var#*=}")
 done
