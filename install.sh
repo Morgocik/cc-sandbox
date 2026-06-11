@@ -38,7 +38,7 @@ echo "Installing cc-sandbox:"
 install -Dm755 "$SRC_DIR/cc-sandbox" "$BIN_DIR/cc-sandbox"
 echo "  [ok]   $BIN_DIR/cc-sandbox"
 
-install -Dm644 "$SRC_DIR/.cc-sandbox.conf" "$DATA_DIR/.cc-sandbox.conf"
+install -Dm644 "$SRC_DIR/template/.cc-sandbox.conf" "$DATA_DIR/.cc-sandbox.conf"
 echo "  [ok]   $DATA_DIR/.cc-sandbox.conf"
 
 # ─── PATH check ────────────────────────────────────────────────────────────────
