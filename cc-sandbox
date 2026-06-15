@@ -47,6 +47,7 @@ fi
 # ─── load per-project config ──────────────────────────────────────────────────
 EXTRA_BIND_RO=""
 EXTRA_BIND_RW=""
+EXCLUDE_PATHS=""
 ENV_VARS=""
 DEBUG=false
 
@@ -103,6 +104,22 @@ for path in $EXTRA_BIND_RO; do
 done
 for path in $EXTRA_BIND_RW; do
     [[ -e "$path" ]] && BWRAP_ARGS+=(--bind "$path" "$path")
+done
+
+# exclude (hide) paths — overlay on top of the RW binds above, so this MUST come
+# after them. Relative paths resolve against $PWD; absolute paths are used as-is.
+# A dir becomes an empty ephemeral tmpfs; a file is masked with read-only /dev/null
+# (reads empty, writes blocked). Limitation: only hides paths that exist at launch —
+# a file Claude creates mid-session cannot be masked retroactively.
+for path in $EXCLUDE_PATHS; do
+    [[ "$path" != /* ]] && path="$PWD/$path"
+    if [[ -d "$path" ]]; then
+        BWRAP_ARGS+=(--tmpfs "$path")
+    elif [[ -e "$path" ]]; then
+        BWRAP_ARGS+=(--ro-bind /dev/null "$path")
+    else
+        echo "cc-sandbox: warning: EXCLUDE_PATHS entry not found, NOT hidden: $path" >&2
+    fi
 done
 
 # /proc /dev /tmp

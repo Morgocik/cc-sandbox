@@ -52,6 +52,7 @@ cc-sandbox -p "explain this repo"
 |---|---|
 | `EXTRA_BIND_RO` | Space-separated paths to mount **read-only** into the sandbox |
 | `EXTRA_BIND_RW` | Space-separated paths to mount **read-write** |
+| `EXCLUDE_PATHS` | Space-separated paths to **hide** from the sandbox (relative to the project root, or absolute). A directory becomes an empty tmpfs, a file an empty read-only mount. Only affects paths that exist at launch |
 | `ENV_VARS` | Space-separated `KEY=VALUE` pairs to set inside the sandbox |
 | `DEBUG` | `true` → write the full `bwrap` command to `.cc-sandbox.log` and exit without launching |
 
@@ -79,6 +80,12 @@ Everything below is the *complete* list of what Claude can see. Read-only unless
 | `/proc` | proc | Process filesystem — required by Node and many tools | **Yes** |
 | `/dev` | dev | Minimal device nodes (`/dev/null`, `/dev/urandom`, tty) | **Yes** |
 | `/tmp` | tmpfs | Scratch space, isolated and wiped when the sandbox exits | **Yes** |
+
+`$PWD` is mounted whole, but you can carve paths back out with `EXCLUDE_PATHS` (see
+[Configuration](#configuration)) — useful for keeping secrets like `.env` out of the
+sandbox even though they live in the project. Hidden directories appear empty and
+files appear blank; the real contents stay invisible and unmodifiable. This only
+covers paths that exist when the sandbox launches.
 
 The sandbox runs with `--unshare-all --share-net`: isolated PID/IPC/etc. namespaces,
 but network **is** shared (Claude needs to reach the API).
