@@ -31,6 +31,8 @@ if [[ "${1:-}" == "init" ]]; then
     # .gitignore — append cc-sandbox entries if not already present
     _gitignore_append() {
         if ! grep -qxF "$1" .gitignore 2>/dev/null; then
+            # if the file doesn't end in a newline, add one so we don't glue onto the last line
+            [[ -n "$(tail -c1 .gitignore 2>/dev/null)" ]] && echo >> .gitignore
             echo "$1" >> .gitignore
             echo "  [ok]   .gitignore ($1)"
         else
